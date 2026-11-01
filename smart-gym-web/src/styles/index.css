@@ -1,0 +1,26 @@
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family:
+    'PingFang SC',
+    'Helvetica Neue',
+    Arial,
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  color: var(--el-text-color-primary);
+  background: var(--el-bg-color);
+}
+
+a {
+  color: var(--el-color-primary);
+  text-decoration: none;
+}
