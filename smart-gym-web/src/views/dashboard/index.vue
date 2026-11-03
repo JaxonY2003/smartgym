@@ -99,19 +99,32 @@ async function loadTrend() {
   trendLoading.value = true
   try {
     const { from, to } = last30Days()
-    trendData.value = await dashboardApi.getTrend(trendMetric.value, from, to)
+    const data = await dashboardApi.getTrend(trendMetric.value, from, to)
+    trendLoading.value = false
+    trendData.value = data
+    // 先关 loading 再等两帧：chart div 由 v-if 控制，需等其真正插入 DOM 且有尺寸后 init
     await nextTick()
+    await new Promise((r) => requestAnimationFrame(() => r(null)))
     renderChart()
   } catch {
-    trendData.value = null
-  } finally {
     trendLoading.value = false
+    trendData.value = null
   }
 }
 
 function renderChart() {
+  // 初次渲染时容器可能因 v-loading 尚未挂载；存在实例则只更新配置
+  if (chart) {
+    applyChartOption()
+    return
+  }
   if (!chartEl.value) return
-  chart ??= echarts.init(chartEl.value)
+  chart = echarts.init(chartEl.value)
+  applyChartOption()
+}
+
+function applyChartOption() {
+  if (!chart) return
   const points = trendData.value?.points ?? []
   chart.setOption({
     grid: { left: 44, right: 16, top: 20, bottom: 28 },
@@ -166,8 +179,10 @@ function handleResize() {
   chart?.resize()
 }
 
-onMounted(() => {
-  loadOverview()
+onMounted(async () => {
+  // 页面根元素有 v-loading="loading"：overview 返回前 chart div 尚未挂载，
+  // 必须先等 overview 完成再拉趋势并渲染，否则 chartEl 为 null 直接跳过
+  await loadOverview()
   loadTrend()
   window.addEventListener('resize', handleResize)
 })

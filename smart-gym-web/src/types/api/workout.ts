@@ -9,12 +9,15 @@ export type WorkoutPlanSource = 'AGENT' | 'MANUAL' | 'TEMPLATE'
 /** 计划状态（5.3 PATCH 示例值 PAUSED；DRAFT/ACTIVE/PAUSED/ARCHIVED 为常见全集，后端定稿后对齐） */
 export type WorkoutPlanStatus = 'DRAFT' | 'ACTIVE' | 'PAUSED' | 'ARCHIVED'
 
-/** 计划内单个动作安排（5.1） */
+/** 计划内单个动作安排（5.1）。后端返回 targetRepsMin/Max + 可选 targetReps 拼接串 */
 export interface PlanExercise {
   exerciseId: number
   exerciseName: string
   sets: number
-  targetReps: string
+  /** 详情可能返回拼接串；创建时用 min/max 上送 */
+  targetReps?: string
+  targetRepsMin?: number
+  targetRepsMax?: number
   restSeconds: number | null
   tempo: string | null
   notes: string | null

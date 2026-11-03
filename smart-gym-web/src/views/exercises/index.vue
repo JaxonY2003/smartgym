@@ -10,9 +10,8 @@ import {
   EQUIPMENT_STATUS_LABELS,
   EQUIPMENT_STATUS_TAG_TYPES,
   MUSCLE_GROUP_LABELS,
-  toOptions,
 } from '@/constants/dictionaries'
-import type { Equipment, Exercise, MuscleGroupCode } from '@/types/api/exercise'
+import type { Equipment, Exercise, MuscleGroup, MuscleGroupCode } from '@/types/api/exercise'
 
 /* ==================== 动作库 ==================== */
 
@@ -27,7 +26,26 @@ const filters = reactive({
   page: 1,
 })
 
-const muscleOptions = toOptions(MUSCLE_GROUP_LABELS)
+const muscleGroups = ref<MuscleGroup[]>([])
+const muscleOptions = computed(() => {
+  const source = muscleGroups.value.length
+    ? muscleGroups.value
+    : Object.entries(MUSCLE_GROUP_LABELS).map(([code, name]) => ({ code, name }))
+  return source.map((group) => ({ label: group.name, value: group.code }))
+})
+const muscleLabelMap = computed<Record<string, string>>(() => ({
+  ...MUSCLE_GROUP_LABELS,
+  ...Object.fromEntries(muscleGroups.value.map((group) => [group.code, group.name])),
+}))
+
+async function loadMuscleGroups() {
+  try {
+    const data = await exerciseApi.getMuscleGroups({ page: 1, pageSize: 100 })
+    muscleGroups.value = data.items
+  } catch {
+    muscleGroups.value = []
+  }
+}
 
 /** 输入防抖：停止输入 400ms 后再查询 */
 let keywordTimer: ReturnType<typeof setTimeout> | null = null
@@ -125,6 +143,7 @@ const hasFilter = computed(
 )
 
 onMounted(() => {
+  loadMuscleGroups()
   loadExercises()
 })
 </script>
@@ -205,7 +224,7 @@ onMounted(() => {
                     type="primary"
                     effect="plain"
                   >
-                    {{ MUSCLE_GROUP_LABELS[m] ?? m }}
+                    {{ muscleLabelMap[m] ?? m }}
                   </el-tag>
                 </div>
                 <div v-if="ex.equipment.length" class="equipment-line">
@@ -255,7 +274,8 @@ onMounted(() => {
                 </el-tag>
               </template>
             </el-table-column>
-            <el-table-column prop="remark" label="备注" min-width="160" show-overflow-tooltip />
+            <el-table-column prop="brand" label="品牌" min-width="130" show-overflow-tooltip />
+            <el-table-column prop="description" label="说明" min-width="180" show-overflow-tooltip />
             <template #empty>
               <el-empty description="暂无器械数据" :image-size="72" />
             </template>
@@ -300,6 +320,14 @@ onMounted(() => {
           <p v-if="currentDetail.englishName" class="english-name">
             {{ currentDetail.englishName }}
           </p>
+          <p v-if="currentDetail.description" class="detail-desc">
+            {{ currentDetail.description }}
+          </p>
+        </div>
+
+        <div v-if="currentDetail.instructions" class="detail-section">
+          <h4>动作步骤</h4>
+          <p class="detail-instructions">{{ currentDetail.instructions }}</p>
         </div>
 
         <div class="detail-section">
@@ -311,7 +339,7 @@ onMounted(() => {
               type="primary"
               effect="plain"
             >
-              {{ MUSCLE_GROUP_LABELS[m] ?? m }}
+              {{ muscleLabelMap[m] ?? m }}
             </el-tag>
             <span v-if="!currentDetail.primaryMuscles.length" class="muted">—</span>
           </div>
@@ -497,6 +525,20 @@ onMounted(() => {
   margin: 0;
   font-size: 13px;
   color: var(--el-text-color-placeholder);
+}
+
+.detail-desc {
+  margin: 8px 0 0;
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--el-text-color-regular);
+}
+
+.detail-instructions {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.8;
+  color: var(--el-text-color-regular);
 }
 
 .contra-list {

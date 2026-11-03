@@ -7,6 +7,7 @@ import type { ApiEnvelope, PageData } from '@/types/api/common'
 import type {
   BodyMetric,
   BodyMetricInput,
+  HealthConstraint,
   HealthConstraintsData,
   MemberProfile,
   MemberProfileInput,
@@ -44,13 +45,15 @@ export async function createBodyMetric(data: BodyMetricInput): Promise<BodyMetri
   return body.data
 }
 
-/** 查询健康限制（3.4） */
+/** 查询健康限制（3.4）。后端 data 为裸数组（无独立 medicalNotice），转为前端结构 */
 export async function getHealthConstraints(): Promise<HealthConstraintsData> {
-  const { data: body } = await request.get<ApiEnvelope<HealthConstraintsData>>(
+  const { data: body } = await request.get<ApiEnvelope<HealthConstraint[] | HealthConstraintsData>>(
     '/member/health-constraints',
     { silent: true },
   )
-  return body.data
+  const data = body.data
+  if (Array.isArray(data)) return { constraints: data, medicalNotice: null }
+  return data
 }
 
 /** 更新健康限制（3.4，PUT 全量） */

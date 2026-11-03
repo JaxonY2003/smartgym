@@ -19,6 +19,7 @@ import { formatDate } from '@/utils/datetime'
 import type { Food, MealType } from '@/types/api/nutrition'
 import type { FitnessGoal } from '@/types/api/member'
 import type { MealPlan } from '@/types/api/meal-plan'
+import { mealsOf } from '@/types/api/meal-plan'
 
 /* ==================== 列表 ==================== */
 
@@ -285,7 +286,7 @@ onMounted(() => {
         <el-table-column type="expand">
           <template #default="{ row }: { row: MealPlan }">
             <div class="expand-content">
-              <template v-for="meal in (detailCache[row.id] ?? row).meals" :key="meal.mealType + meal.time">
+              <template v-for="meal in mealsOf(detailCache[row.id] ?? row)" :key="meal.mealType + meal.time">
                 <div class="meal-block">
                   <div class="meal-block-head">
                     <b>{{ MEAL_TYPE_LABELS[meal.mealType] }}</b>
@@ -293,8 +294,8 @@ onMounted(() => {
                   </div>
                   <el-table :data="meal.items" size="small" border>
                     <el-table-column label="食物" min-width="120">
-                      <template #default="{ row: item }: { row: { id?: number; foodName?: string; foodId: number } }">
-                        {{ item.foodName ?? `食物 #${item.foodId}` }}
+                      <template #default="{ row: item }: { row: { id?: number; foodName?: string; foodNameSnapshot?: string; foodId: number } }">
+                        {{ item.foodName ?? item.foodNameSnapshot ?? `食物 #${item.foodId}` }}
                       </template>
                     </el-table-column>
                     <el-table-column label="份量" width="90" align="right">
@@ -303,13 +304,13 @@ onMounted(() => {
                       </template>
                     </el-table-column>
                     <el-table-column v-if="meal.items.some((i) => i.id)" label="操作" width="90" align="center">
-                      <template #default="{ row: item }: { row: { id?: number; foodName?: string; foodId: number } }">
+                      <template #default="{ row: item }: { row: { id?: number; foodName?: string; foodNameSnapshot?: string; foodId: number } }">
                         <el-button
                           v-if="item.id"
                           size="small"
                           text
                           type="primary"
-                          @click="openReplace(row, item.id!, item.foodName ?? `#${item.foodId}`)"
+                          @click="openReplace(row, item.id!, item.foodName ?? item.foodNameSnapshot ?? `#${item.foodId}`)"
                         >
                           替换
                         </el-button>
@@ -340,7 +341,7 @@ onMounted(() => {
           </template>
         </el-table-column>
         <el-table-column label="餐次" width="70" align="center">
-          <template #default="{ row }: { row: MealPlan }">{{ row.meals.length }}</template>
+          <template #default="{ row }: { row: MealPlan }">{{ mealsOf(row).length }}</template>
         </el-table-column>
         <el-table-column label="状态" width="90" align="center">
           <template #default="{ row }: { row: MealPlan }">

@@ -20,6 +20,24 @@ export type MuscleGroupCode =
   | 'CORE'
   | 'FULL_BODY'
 
+export type MuscleGroupStatus = 'ACTIVE' | 'INACTIVE'
+
+export interface MuscleGroup {
+  id: number
+  code: MuscleGroupCode | string
+  name: string
+  parentId: number | null
+  sortOrder: number
+  status: MuscleGroupStatus
+}
+
+export interface MuscleGroupQuery {
+  status?: MuscleGroupStatus
+  parentId?: number
+  page: number
+  pageSize: number
+}
+
 export interface EquipmentRef {
   id: number
   name: string
@@ -30,6 +48,10 @@ export interface Exercise {
   id: number
   name: string
   englishName: string | null
+  /** 动作描述（详情接口返回） */
+  description?: string | null
+  /** 动作步骤说明（详情接口返回） */
+  instructions?: string | null
   primaryMuscles: MuscleGroupCode[]
   equipment: EquipmentRef[]
   difficulty: ExerciseDifficulty
@@ -57,14 +79,14 @@ export type EquipmentCategory =
   | 'ACCESSORY'
   | 'OTHER'
 
-/** 器械状态（4.2 示例值 AVAILABLE） */
-export type EquipmentStatus = 'AVAILABLE' | 'IN_USE' | 'MAINTENANCE' | 'RETIRED'
+/** 器械状态（4.3） */
+export type EquipmentStatus = 'ACTIVE' | 'INACTIVE'
 
 export interface Equipment {
   id: number
   name: string
   category: EquipmentCategory
   status: EquipmentStatus
-  gymId: number
-  remark: string | null
+  brand: string | null
+  description: string | null
 }

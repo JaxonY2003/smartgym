@@ -12,7 +12,7 @@
 
 ### 1.2 项目定位
 
-SmartGym Copilot 面向健身房会员、教练和运营人员，提供个性化训练计划、健康饮食建议、训练与饮食记录、知识问答、动态计划调整以及健身房运营管理功能。
+SmartGym Copilot 面向普通健身用户，提供个性化训练计划、健康饮食建议、训练与饮食记录、知识问答和动态计划调整功能。
 
 本项目不是简单的大模型聊天应用，而是一个具备真实业务数据、Agent 工具调用、RAG 知识检索、用户记忆、结构化输出、安全校验和业务操作能力的完整 Agent 工程项目。
 
@@ -39,9 +39,9 @@ SmartGym Copilot 面向健身房会员、教练和运营人员，提供个性化
 
 ## 2. 用户角色
 
-### 2.1 会员
+### 2.1 普通用户
 
-会员可以：
+普通用户可以：
 
 - 注册、登录和维护个人资料
 - 设置增肌、减脂、塑形或维持体重等目标
@@ -61,12 +61,12 @@ SmartGym Copilot 面向健身房会员、教练和运营人员，提供个性化
 
 教练功能可作为增强模块，包括：
 
-- 查看授权会员的训练情况
-- 查看会员训练计划完成率
+- 查看授权用户的训练情况
+- 查看用户训练计划完成率
 - 审核或修改 Agent 生成的训练方案
 - 维护训练计划模板
 - 查看异常训练反馈
-- 处理会员疼痛或训练风险提示
+- 处理用户疼痛或训练风险提示
 
 ### 2.3 管理员
 
@@ -77,7 +77,7 @@ SmartGym Copilot 面向健身房会员、教练和运营人员，提供个性化
 - 管理健身器械和器械状态
 - 管理食物营养数据
 - 管理健身和饮食知识库
-- 查看会员活跃情况
+- 查看用户活跃情况
 - 查看 Agent 运行记录和工具调用日志
 - 查看系统监控和异常信息
 
@@ -118,7 +118,7 @@ Agent 执行：
 1. 获取用户训练目标
 2. 获取训练经验与身体限制
 3. 获取每周可训练时间
-4. 获取健身房可用器械
+4. 获取可用器械
 5. 检索候选训练动作
 6. 生成结构化训练计划
 7. 调用规则引擎校验训练量
@@ -197,7 +197,7 @@ Agent 会：
 ```mermaid
 flowchart TB
     subgraph Client[Vue 3 前端]
-        M[会员端]
+        M[用户端]
         A[管理后台]
         C[Agent 对话页]
     end
@@ -341,7 +341,7 @@ EmbeddingModel
 
 ## 7. 前端模块设计
 
-### 7.1 会员首页
+### 7.1 用户首页
 
 展示内容：
 
@@ -526,7 +526,7 @@ SafetyAdvisor
 
 主要职责：
 
-- 接收会员消息并校验当前用户身份
+- 接收用户消息并校验当前用户身份
 - 使用 `ChatClient` 组装系统提示、会话记忆和业务上下文
 - 注册 Spring AI 工具并驱动工具调用循环
 - 将状态、工具调用、计划预览和文本内容转换为 SSE 事件
@@ -728,7 +728,7 @@ getTodayWorkout(userId)
 calculateWeeklyTrainingVolume(userId)
 searchExercises(muscleGroup, equipment)
 getExerciseDetail(exerciseId)
-listAvailableEquipment(gymId)
+listAvailableEquipment()
 validateTrainingPlan(plan)
 saveTrainingPlanAfterConfirmation(userId, plan, idempotencyKey)
 updateTrainingPlanAfterConfirmation(planId, changes, idempotencyKey)
@@ -931,8 +931,7 @@ training_goal
 exercise
 muscle_group
 exercise_muscle
- equipment
-gym_equipment
+equipment
 exercise_equipment
 workout_plan
 workout_plan_day
@@ -1383,7 +1382,7 @@ Agent 执行：
 
 ### 项目简介
 
-基于 Vue 3、Java 21、Spring Boot、Spring AI 和 MySQL 构建智能健身与健康饮食管理平台，为会员提供个性化训练计划、饮食建议、执行记录、动态调整和健身知识问答。
+基于 Vue 3、Java 21、Spring Boot、Spring AI 和 MySQL 构建智能健身与健康饮食管理平台，为普通用户提供个性化训练计划、饮食建议、执行记录、动态调整和健身知识问答。
 
 ### 简历亮点
 

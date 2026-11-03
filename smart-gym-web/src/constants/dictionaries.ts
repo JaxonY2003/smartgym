@@ -142,20 +142,13 @@ export const EQUIPMENT_CATEGORY_LABELS: Record<EquipmentCategory, string> = {
 }
 
 export const EQUIPMENT_STATUS_LABELS: Record<EquipmentStatus, string> = {
-  AVAILABLE: '可用',
-  IN_USE: '使用中',
-  MAINTENANCE: '维护中',
-  RETIRED: '已停用',
+  ACTIVE: '启用',
+  INACTIVE: '停用',
 }
 
-export const EQUIPMENT_STATUS_TAG_TYPES: Record<
-  EquipmentStatus,
-  'success' | 'info' | 'warning' | 'danger'
-> = {
-  AVAILABLE: 'success',
-  IN_USE: 'info',
-  MAINTENANCE: 'warning',
-  RETIRED: 'danger',
+export const EQUIPMENT_STATUS_TAG_TYPES: Record<EquipmentStatus, 'success' | 'danger'> = {
+  ACTIVE: 'success',
+  INACTIVE: 'danger',
 }
 
 /* ---------- 训练计划与记录（接口文档 §5） ---------- */

@@ -79,13 +79,20 @@ export async function createWaterRecord(recordedAt: string, amountMl: number): P
   await request.post('/water-records', { recordedAt, amountMl })
 }
 
-/** 查询某日饮水记录（6.6） */
+/** 查询某日饮水记录（6.6）。后端返回记录裸数组，前端聚合出总量 */
 export async function getWaterRecords(date: string): Promise<{ totalMl: number; records: { recordedAt: string; amountMl: number }[] }> {
-  const { data: body } = await request.get<ApiEnvelope<{ totalMl: number; records: { recordedAt: string; amountMl: number }[] }>>(
+  const { data: body } = await request.get<ApiEnvelope<{ recordedAt: string; amountMl: number }[] | { totalMl: number; records: { recordedAt: string; amountMl: number }[] }>>(
     '/water-records',
     { params: { date }, silent: true },
   )
-  return body.data
+  const data = body.data
+  if (Array.isArray(data)) {
+    return {
+      totalMl: data.reduce((sum, r) => sum + (r.amountMl ?? 0), 0),
+      records: data,
+    }
+  }
+  return data
 }
 
 /* ---------- 饮食计划（6.5） ---------- */

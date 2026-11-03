@@ -21,13 +21,39 @@ export async function getWorkoutPlans(
   return body.data
 }
 
-/** 查询某日期应执行的训练日（5.1 today） */
+/** 查询某日期应执行的训练日（5.1 today）。后端返回完整计划对象（含全部 days），
+ *  此处裁剪出与查询日期匹配的训练日；没有匹配日或无激活计划时返回 null */
 export async function getTodayPlan(date?: string): Promise<WorkoutPlanDayView | null> {
-  const { data: body } = await request.get<ApiEnvelope<WorkoutPlanDayView | null>>(
+  const { data: body } = await request.get<ApiEnvelope<WorkoutPlan | null>>(
     '/workout-plans/today',
     { params: date ? { date } : {}, silent: true },
   )
-  return body.data
+  const plan = body.data
+  if (!plan) return null
+
+  // 后端按 date 找到当天应执行的训练日；它返回完整计划对象，days 里只含匹配日（curl 实测）
+  // 兜底：若返回全部 days，则按星期几自行匹配
+  const weekday = date ? new Date(`${date}T12:00:00`).getDay() : new Date().getDay()
+  const dow = weekday === 0 ? 7 : weekday
+  const target = plan.days.find((d) => d.dayOfWeek === dow) ?? plan.days[0]
+  if (!target) return null
+
+  return {
+    planId: plan.id,
+    planName: plan.name,
+    dayId: target.id,
+    dayOfWeek: target.dayOfWeek,
+    title: target.title,
+    estimatedMinutes: target.estimatedMinutes,
+    exercises: target.exercises.map((e) => ({
+      exerciseId: e.exerciseId,
+      exerciseName: e.exerciseName,
+      sets: e.sets,
+      targetReps: e.targetReps ?? (e.targetRepsMin && e.targetRepsMax ? `${e.targetRepsMin}-${e.targetRepsMax}` : ''),
+      restSeconds: e.restSeconds,
+      notes: e.notes,
+    })),
+  }
 }
 
 /** 计划详情（5.1） */

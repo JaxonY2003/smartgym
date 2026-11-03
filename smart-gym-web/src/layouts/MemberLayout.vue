@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useAuthStore } from '@/stores/auth'
@@ -6,6 +7,15 @@ import { useAuthStore } from '@/stores/auth'
 const route = useRoute()
 const router = useRouter()
 const auth = useAuthStore()
+
+// 刷新后 Pinia 状态重置但 token 还在：拉取当前用户恢复 header 显示与管理员入口
+onMounted(() => {
+  if (auth.isLoggedIn && !auth.user) {
+    auth.fetchCurrentUser().catch(() => {
+      // /auth/me 失败（token 已失效等）由 request.ts 401 逻辑处理跳转
+    })
+  }
+})
 
 const menus = [
   { path: '/dashboard', title: '首页', icon: 'HomeFilled' },

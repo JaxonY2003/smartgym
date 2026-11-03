@@ -1,7 +1,7 @@
 -- SmartGym Copilot
 -- MySQL 8.0+ baseline schema
 -- Encoding: utf8mb4 / Collation: utf8mb4_0900_ai_ci
--- This file is intended to be used as the first Flyway migration.
+-- This file is a standalone reference schema. Flyway migrations are versioned under smart_gym/src/main/resources/db/migration/.
 -- It does not contain DROP statements. Production changes should be delivered by later migrations.
 
 SET NAMES utf8mb4;
@@ -57,28 +57,7 @@ CREATE TABLE IF NOT EXISTS sys_refresh_token (
     CONSTRAINT fk_refresh_token_user FOREIGN KEY (user_id) REFERENCES sys_user (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='刷新令牌';
 
-CREATE TABLE IF NOT EXISTS gym (
-    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-    name VARCHAR(128) NOT NULL,
-    address VARCHAR(255) NULL,
-    status VARCHAR(32) NOT NULL DEFAULT 'ACTIVE',
-    created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
-    updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
-    PRIMARY KEY (id),
-    KEY idx_gym_status (status)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='健身房';
 
-CREATE TABLE IF NOT EXISTS gym_user (
-    gym_id BIGINT UNSIGNED NOT NULL,
-    user_id BIGINT UNSIGNED NOT NULL,
-    membership_status VARCHAR(32) NOT NULL DEFAULT 'ACTIVE',
-    joined_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
-    left_at DATETIME(3) NULL,
-    PRIMARY KEY (gym_id, user_id),
-    KEY idx_gym_user_user (user_id, membership_status),
-    CONSTRAINT fk_gym_user_gym FOREIGN KEY (gym_id) REFERENCES gym (id),
-    CONSTRAINT fk_gym_user_user FOREIGN KEY (user_id) REFERENCES sys_user (id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='健身房用户关系';
 
 CREATE TABLE IF NOT EXISTS member_profile (
     user_id BIGINT UNSIGNED NOT NULL,
@@ -94,7 +73,7 @@ CREATE TABLE IF NOT EXISTS member_profile (
     updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
     PRIMARY KEY (user_id),
     CONSTRAINT fk_member_profile_user FOREIGN KEY (user_id) REFERENCES sys_user (id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='会员健康基础档案';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='用户健康基础档案';
 
 CREATE TABLE IF NOT EXISTS body_metric (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -330,22 +309,6 @@ CREATE TABLE IF NOT EXISTS equipment (
     KEY idx_equipment_name_status (name, status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='器械类型';
 
-CREATE TABLE IF NOT EXISTS gym_equipment (
-    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-    gym_id BIGINT UNSIGNED NOT NULL,
-    equipment_id BIGINT UNSIGNED NOT NULL,
-    asset_code VARCHAR(64) NULL,
-    status VARCHAR(32) NOT NULL DEFAULT 'AVAILABLE',
-    quantity INT UNSIGNED NOT NULL DEFAULT 1,
-    note VARCHAR(500) NULL,
-    created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
-    updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
-    PRIMARY KEY (id),
-    UNIQUE KEY uk_gym_equipment_asset_code (gym_id, asset_code),
-    KEY idx_gym_equipment_lookup (gym_id, equipment_id, status),
-    CONSTRAINT fk_gym_equipment_gym FOREIGN KEY (gym_id) REFERENCES gym (id),
-    CONSTRAINT fk_gym_equipment_equipment FOREIGN KEY (equipment_id) REFERENCES equipment (id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='健身房器械实例';
 
 CREATE TABLE IF NOT EXISTS exercise_equipment (
     exercise_id BIGINT UNSIGNED NOT NULL,
@@ -359,7 +322,6 @@ CREATE TABLE IF NOT EXISTS exercise_equipment (
 CREATE TABLE IF NOT EXISTS workout_plan (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
     user_id BIGINT UNSIGNED NOT NULL,
-    gym_id BIGINT UNSIGNED NULL,
     name VARCHAR(128) NOT NULL,
     source VARCHAR(32) NOT NULL DEFAULT 'MANUAL',
     goal VARCHAR(32) NULL,
@@ -380,7 +342,6 @@ CREATE TABLE IF NOT EXISTS workout_plan (
     KEY idx_workout_plan_user_status (user_id, status, starts_on),
     KEY idx_workout_plan_confirmed_run (confirmed_run_id),
     CONSTRAINT fk_workout_plan_user FOREIGN KEY (user_id) REFERENCES sys_user (id),
-    CONSTRAINT fk_workout_plan_gym FOREIGN KEY (gym_id) REFERENCES gym (id),
     CONSTRAINT fk_workout_plan_creator FOREIGN KEY (created_by_user_id) REFERENCES sys_user (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='训练计划';
 
@@ -921,11 +882,11 @@ CREATE TABLE IF NOT EXISTS audit_log (
 
 -- Recommended seed data. Passwords must be replaced by application-generated BCrypt hashes.
 INSERT INTO sys_role (code, name, description)
-SELECT 'MEMBER', '会员', '普通会员'
+SELECT 'MEMBER', '用户', '普通用户'
 WHERE NOT EXISTS (SELECT 1 FROM sys_role WHERE code = 'MEMBER');
 
 INSERT INTO sys_role (code, name, description)
-SELECT 'TRAINER', '教练', '授权会员的训练管理人员'
+SELECT 'TRAINER', '教练', '授权用户的训练管理人员'
 WHERE NOT EXISTS (SELECT 1 FROM sys_role WHERE code = 'TRAINER');
 
 INSERT INTO sys_role (code, name, description)

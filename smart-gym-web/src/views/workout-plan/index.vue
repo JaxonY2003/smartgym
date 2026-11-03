@@ -374,7 +374,11 @@ onMounted(() => {
           <el-table :data="day.exercises" size="small" border>
             <el-table-column prop="exerciseName" label="动作" min-width="110" />
             <el-table-column prop="sets" label="组数" width="55" align="center" />
-            <el-table-column prop="targetReps" label="次数" width="80" align="center" />
+            <el-table-column label="次数" width="80" align="center">
+              <template #default="{ row }: { row: PlanExercise }">
+                {{ row.targetReps ?? (row.targetRepsMin && row.targetRepsMax ? `${row.targetRepsMin}-${row.targetRepsMax}` : '—') }}
+              </template>
+            </el-table-column>
             <el-table-column label="休息" width="70" align="center">
               <template #default="{ row }: { row: PlanExercise }">
                 {{ row.restSeconds ? `${row.restSeconds}s` : '—' }}

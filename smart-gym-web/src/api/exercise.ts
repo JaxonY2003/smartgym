@@ -3,7 +3,24 @@
  */
 import request from '@/utils/request'
 import type { ApiEnvelope, PageData } from '@/types/api/common'
-import type { Equipment, Exercise, ExerciseQuery } from '@/types/api/exercise'
+import type { Equipment, Exercise, ExerciseQuery, MuscleGroup, MuscleGroupQuery } from '@/types/api/exercise'
+
+/** 分页查询肌群（4.1）；普通用户只会返回 ACTIVE 数据 */
+export async function getMuscleGroups(query: MuscleGroupQuery): Promise<PageData<MuscleGroup>> {
+  const { data: body } = await request.get<ApiEnvelope<PageData<MuscleGroup>>>('/muscle-groups', {
+    params: query,
+    silent: true,
+  })
+  return body.data
+}
+
+/** 肌群详情（4.1） */
+export async function getMuscleGroup(id: number): Promise<MuscleGroup> {
+  const { data: body } = await request.get<ApiEnvelope<MuscleGroup>>(`/muscle-groups/${id}`, {
+    silent: true,
+  })
+  return body.data
+}
 
 /** 分页查询动作（4.1），支持关键词/肌群/器械筛选 */
 export async function getExercises(query: ExerciseQuery): Promise<PageData<Exercise>> {

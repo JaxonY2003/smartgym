@@ -1,11 +1,11 @@
 # SmartGym Copilot 接口文档
 
-- 文档版本：v1.0
+- 文档版本：v1.2
 - 接口前缀：`/api/v1`
-- 适用范围：会员端、Agent 对话端、管理后台
+- 适用范围：用户端、Agent 对话端、管理后台
 - 数据格式：`application/json; charset=utf-8`
 - 字段命名：JSON 使用 `camelCase`
-- 时间格式：ISO 8601，例如 `2026-10-31T10:30:00+08:00`
+- 时间格式：ISO 8601，认证接口统一返回 UTC 偏移，例如 `2026-10-31T02:30:00Z`；需要展示用户本地时间时由前端按用户时区转换
 - 日期格式：`yyyy-MM-dd`
 - 金额和营养数值：使用 `number`，单位在字段名或说明中标明
 
@@ -23,6 +23,8 @@
 Authorization: Bearer <accessToken>
 Content-Type: application/json
 X-Request-Id: <可选，客户端生成的请求标识>
+
+服务端始终在响应头 `X-Request-Id` 和响应体 `traceId` 返回同一个值；未传或格式非法时由服务端生成。
 ```
 
 涉及写入的接口还需要：
@@ -98,7 +100,9 @@ Idempotency-Key: <uuid>
 | 401 | 未登录、Token 过期或无效 |
 | 403 | 无权限访问资源 |
 | 404 | 资源不存在 |
+| 405 | 请求方法不被支持 |
 | 409 | 幂等冲突、状态冲突或重复操作 |
+| 415 | 请求内容类型不被支持 |
 | 422 | 结构化数据或业务规则校验失败 |
 | 429 | 访问频率超过限制 |
 | 500 | 服务端异常 |
@@ -106,23 +110,56 @@ Idempotency-Key: <uuid>
 
 ### 1.6 错误码
 
-| 错误码 | 含义 |
-|---|---|
-| `AUTH_INVALID_CREDENTIALS` | 用户名或密码错误 |
-| `AUTH_TOKEN_INVALID` | Access Token 无效 |
-| `AUTH_TOKEN_EXPIRED` | Access Token 已过期 |
-| `FORBIDDEN` | 当前用户无权执行操作 |
-| `RESOURCE_NOT_FOUND` | 资源不存在 |
-| `VALIDATION_ERROR` | 参数校验失败 |
-| `BUSINESS_RULE_VIOLATION` | 训练、营养或安全规则不通过 |
-| `CONFIRMATION_REQUIRED` | 写操作需要用户确认 |
-| `IDEMPOTENCY_CONFLICT` | 幂等键对应的请求内容不一致 |
-| `AGENT_RUN_NOT_FOUND` | Agent 运行记录不存在 |
-| `AGENT_OUTPUT_INVALID` | 模型结构化输出无法通过解析或校验 |
-| `SAFETY_BLOCKED` | 高风险请求已被拦截 |
-| `MODEL_UNAVAILABLE` | 模型服务不可用 |
-| `RATE_LIMITED` | 请求频率过高 |
-| `INTERNAL_ERROR` | 未分类服务端错误 |
+`code` 是前后端共同维护的稳定标识；HTTP 状态码表示错误类别，前端按 `code` 显示具体提示。同一个 HTTP 409 可以表示数据约束冲突、训练日归属冲突或组序号重复，不能仅按状态码判断具体原因。
+
+当前后端已经实现的错误码如下：
+
+| 错误码 | HTTP 状态码 | 含义与处理建议 |
+|---|---|---|
+| `AUTH_INVALID_CREDENTIALS` | 401 | 账号或密码错误，检查后重新登录 |
+| `AUTH_TOKEN_INVALID` | 401 | 未登录、Token 无效或过期、刷新令牌失效，或当前用户不存在；前端按认证流程尝试刷新，失败后重新登录 |
+| `ACCOUNT_ALREADY_EXISTS` | 409 | 注册账号已存在，使用其他账号或登录 |
+| `ACCOUNT_DISABLED` | 403 | 账号已被禁用，联系管理员 |
+| `DEFAULT_ROLE_NOT_FOUND` | 500 | 注册所需的默认会员角色缺失，由管理员修复系统配置；前端展示注册服务不可用 |
+| `FORBIDDEN` | 403 | 当前用户无权执行操作 |
+| `RESOURCE_NOT_FOUND` | 404 | 通用资源不存在或对当前用户不可见 |
+| `MALFORMED_REQUEST` | 400 | 请求体格式不正确，例如非法 JSON 或字段无法反序列化 |
+| `INVALID_REQUEST` | 400 | 缺少必需的查询参数，或路径、查询参数类型不正确 |
+| `METHOD_NOT_ALLOWED` | 405 | 请求方法不被支持，检查接口使用的 HTTP 方法 |
+| `UNSUPPORTED_MEDIA_TYPE` | 415 | 请求内容类型不被支持，检查 `Content-Type` |
+| `VALIDATION_ERROR` | 400 / 422 | 参数值或业务输入校验失败；当前实现中查询范围、枚举等校验可返回 400，Bean Validation 和业务字段校验返回 422。响应 `data` 存在 `fieldErrors` 或 `violations` 时可展示校验详情 |
+| `DATA_CONFLICT` | 409 | 数据已存在或违反数据库约束（如唯一约束、关联约束）；检查输入并刷新相关数据。此码不专指版本冲突，也不承诺重试即可成功 |
+| `ALLERGEN_NOT_FOUND` | 404 / 422 | 过敏原编码不存在；食物目录筛选返回 404，保存健康档案引用无效编码返回 422。刷新过敏原列表并重新选择 |
+| `MUSCLE_GROUP_NOT_FOUND` | 404 | 肌群不存在，刷新目录并重新选择 |
+| `EXERCISE_NOT_FOUND` | 404 | 训练动作不存在，刷新目录并重新选择 |
+| `EQUIPMENT_NOT_FOUND` | 404 | 器械不存在，刷新目录并重新选择 |
+| `PLAN_NOT_FOUND` | 404 | 训练计划不存在或不属于当前用户，刷新计划列表 |
+| `PLAN_DAY_NOT_FOUND` | 404 | 训练日不存在，刷新训练计划 |
+| `PLAN_DAY_MISMATCH` | 409 | 所选训练日不属于指定训练计划，重新选择训练日 |
+| `SESSION_NOT_FOUND` | 404 | 训练记录不存在或不属于当前用户，刷新训练记录列表 |
+| `DUPLICATE_SET_INDEX` | 409 | 提交的训练记录中，同一动作出现重复的组序号，检查并修正各组 `setIndex` |
+| `FOOD_NOT_FOUND` | 404 | 食物不存在，刷新食物目录并重新选择 |
+| `FOOD_UNIT_NOT_SUPPORTED` | 422 | 食物不支持提交的计量单位，使用该食物返回的可用单位 |
+| `FOOD_ALLERGEN_CONFLICT` | 422 | 饮食计划中的食物与当前用户健康档案的过敏原冲突，更换食物 |
+| `MEAL_PLAN_NOT_FOUND` | 404 | 饮食计划不存在或不属于当前用户，刷新计划列表 |
+| `MEAL_PLAN_ITEM_NOT_FOUND` | 404 | 食物项不存在或不属于指定饮食计划，刷新计划详情 |
+| `INTERNAL_ERROR` | 500 | 未分类服务端错误，稍后重试；持续失败时提供 `traceId` 排查 |
+
+以下错误码为后续模块或更细分错误处理预留，当前后端尚未直接返回；前端保留对应提示，不能据此认定相关能力已经实现：
+
+| 错误码 | 约定 HTTP 状态码 | 含义 |
+|---|---|---|
+| `AUTH_TOKEN_EXPIRED` | 401 | Access Token 已过期；当前认证实现统一返回 `AUTH_TOKEN_INVALID` |
+| `BUSINESS_RULE_VIOLATION` | 422 | 训练、营养或安全规则不通过 |
+| `CONFIRMATION_REQUIRED` | 409 | 写操作需要用户确认 |
+| `IDEMPOTENCY_CONFLICT` | 409 | 幂等键对应的请求内容不一致 |
+| `AGENT_RUN_NOT_FOUND` | 404 | Agent 运行记录不存在 |
+| `AGENT_OUTPUT_INVALID` | 422 | 模型结构化输出无法通过解析或校验 |
+| `SAFETY_BLOCKED` | 422 | 高风险请求已被拦截 |
+| `MODEL_UNAVAILABLE` | 503 | 模型服务不可用 |
+| `RATE_LIMITED` | 429 | 请求频率过高 |
+
+新增或调整后端错误码时，应在同一变更中同步本节的状态码、语义与前端 `smart-gym-web/src/constants/errorMessages.ts` 的展示文案。语义不同的错误应使用不同 `code`；不要复用同一码表达无关业务，也不要为同一语义随意改名。
 
 ---
 
@@ -148,7 +185,7 @@ POST /api/v1/auth/register
 
 | 字段 | 类型 | 必填 | 说明 |
 |---|---|---:|---|
-| `account` | string | 是 | 邮箱或手机号，首版建议使用邮箱 |
+| `account` | string | 是 | 3～128 个字符；服务端会去除首尾空白并统一转为小写。首版不强制邮箱/手机号格式，但建议使用邮箱 |
 | `password` | string | 是 | 8～64 位 |
 | `displayName` | string | 是 | 2～30 个字符 |
 
@@ -165,7 +202,7 @@ POST /api/v1/auth/register
     "displayName": "张三"
   },
   "traceId": "tr_01J9ABCDEF",
-  "timestamp": "2026-10-31T10:30:00+08:00"
+  "timestamp": "2026-10-31T10:30:00Z"
 }
 ```
 
@@ -203,7 +240,7 @@ POST /api/v1/auth/login
     }
   },
   "traceId": "tr_01J9ABCDEF",
-  "timestamp": "2026-10-31T10:30:00+08:00"
+  "timestamp": "2026-10-31T10:30:00Z"
 }
 ```
 
@@ -221,7 +258,9 @@ POST /api/v1/auth/refresh
 }
 ```
 
-响应：与登录接口中的 Token 字段相同。
+响应：与登录接口中的 Token 字段相同。旧 refresh token 在成功刷新后立即失效，重复使用返回 `401 AUTH_TOKEN_INVALID`。
+
+认证接口的幂等边界：注册通过账号唯一约束保证重复账号返回 `409 ACCOUNT_ALREADY_EXISTS`；登录每次成功都创建新的 refresh token，不缓存登录响应；刷新采用一次性轮换；退出登录是“撤销全部会话”的幂等操作。认证接口当前不要求 `Idempotency-Key`，业务写接口和 Agent 确认接口仍按后续幂等契约执行。
 
 ### 2.4 退出登录
 
@@ -229,7 +268,7 @@ POST /api/v1/auth/refresh
 POST /api/v1/auth/logout
 ```
 
-请求体为空。服务端使 refresh token 失效。
+请求体为空。服务端撤销当前用户的全部未撤销 refresh token；Access Token 仍按其原有过期时间有效。接口可重复调用，重复调用仍返回成功。
 
 ### 2.5 当前用户
 
@@ -250,16 +289,16 @@ GET /api/v1/auth/me
     "displayName": "张三",
     "avatarUrl": null,
     "roles": ["MEMBER"],
-    "createdAt": "2026-10-01T09:00:00+08:00"
+    "createdAt": "2026-10-01T01:00:00Z"
   },
   "traceId": "tr_01J9ABCDEF",
-  "timestamp": "2026-10-31T10:30:00+08:00"
+  "timestamp": "2026-10-31T10:30:00Z"
 }
 ```
 
 ---
 
-## 3. 会员健康档案
+## 3. 用户健康档案
 
 ### 3.1 查询健康档案
 
@@ -284,10 +323,10 @@ GET /api/v1/member/profile
     "weeklyTrainingDays": 4,
     "maxSessionMinutes": 45,
     "goals": ["FAT_LOSS"],
-    "updatedAt": "2026-10-31T10:30:00+08:00"
+    "updatedAt": "2026-10-31T10:30:00Z"
   },
   "traceId": "tr_01J9ABCDEF",
-  "timestamp": "2026-10-31T10:30:00+08:00"
+  "timestamp": "2026-10-31T10:30:00Z"
 }
 ```
 
@@ -331,7 +370,7 @@ POST /api/v1/member/body-metrics
 
 ```json
 {
-  "measuredAt": "2026-10-31T08:00:00+08:00",
+  "measuredAt": "2026-10-31T08:00:00Z",
   "weightKg": 72.5,
   "bodyFatPercent": 19.8,
   "waistCm": 82.0,
@@ -344,7 +383,7 @@ POST /api/v1/member/body-metrics
 ```json
 {
   "id": 90001,
-  "measuredAt": "2026-10-31T08:00:00+08:00",
+  "measuredAt": "2026-10-31T08:00:00Z",
   "weightKg": 72.5,
   "bodyFatPercent": 19.8,
   "waistCm": 82.0,
@@ -397,7 +436,40 @@ PUT /api/v1/member/nutrition-profile
 
 ## 4. 动作、肌群和器械
 
-### 4.1 查询动作
+### 4.1 查询肌群
+
+肌群是动作筛选和训练计划编排的基础字典数据。用户端只返回 `ACTIVE` 肌群；管理员查询时可以按状态筛选。
+
+```http
+GET /api/v1/muscle-groups?status=ACTIVE&parentId=1&page=1&pageSize=20
+GET /api/v1/muscle-groups/{muscleGroupId}
+```
+
+查询参数：
+
+| 参数 | 类型 | 必填 | 说明 |
+|---|---|---:|---|
+| `status` | string | 否 | `ACTIVE`、`INACTIVE`，默认 `ACTIVE` |
+| `parentId` | number | 否 | 查询指定父级下的肌群；不传表示查询全部层级 |
+| `page` | number | 否 | 默认 `1` |
+| `pageSize` | number | 否 | 默认 `20`，最大 `100` |
+
+响应项：
+
+```json
+{
+  "id": 1,
+  "code": "CHEST",
+  "name": "胸部",
+  "parentId": null,
+  "sortOrder": 10,
+  "status": "ACTIVE"
+}
+```
+
+`code` 是稳定的业务编码，前端展示文案可以自行维护。动作接口返回的 `primaryMuscles` 使用相同的肌群 `code`。
+
+### 4.2 查询动作
 
 ```http
 GET /api/v1/exercises?keyword=深蹲&muscleGroup=LEGS&equipmentId=101&page=1&pageSize=20
@@ -420,10 +492,10 @@ GET /api/v1/exercises/{exerciseId}
 }
 ```
 
-### 4.2 查询器械
+### 4.3 查询器械
 
 ```http
-GET /api/v1/equipment?status=AVAILABLE&page=1&pageSize=20
+GET /api/v1/equipment?status=ACTIVE&page=1&pageSize=20
 GET /api/v1/equipment/{equipmentId}
 ```
 
@@ -434,9 +506,9 @@ GET /api/v1/equipment/{equipmentId}
   "id": 101,
   "name": "哑铃",
   "category": "FREE_WEIGHT",
-  "status": "AVAILABLE",
-  "gymId": 1,
-  "remark": "2.5kg～30kg"
+  "status": "ACTIVE",
+  "brand": null,
+  "description": "2.5kg～30kg"
 }
 ```
 
@@ -541,6 +613,14 @@ PATCH 示例：
 ```
 
 删除和状态变更必须检查当前用户权限。已产生训练记录的计划建议采用逻辑删除或归档。
+
+训练计划激活规则：
+
+- 同一用户最多保留一张未删除的 `ACTIVE` 训练计划。
+- `POST /workout-plans/{planId}/activate` 与 `PATCH status=ACTIVE`（恢复计划）使用相同规则：在同一事务中将其他 `ACTIVE` 计划改为 `PAUSED`，再激活目标计划。
+- 被暂停的计划与目标计划均递增 `version`；其他用户、已删除计划和其他非 ACTIVE 计划不受影响。
+- 同一用户的激活、修改和删除先锁定用户行，避免并发激活或旧状态覆盖；并发激活完成后以最后成功提交的激活结果为准。
+- 激活成功文案为“训练计划已激活”，被替换的计划是“暂停”，不是归档。
 
 ### 5.4 创建训练执行记录
 
@@ -1273,7 +1353,12 @@ GET /swagger-ui/index.html
 
 ### 12.1 前端状态处理
 
-前端统一根据 `success`、HTTP 状态码和 `code` 处理结果，不根据 `message` 文案判断业务逻辑。枚举值由后端返回，前端展示文案自行维护。
+前端统一根据 `success`、HTTP 状态码和 `code` 处理结果，不根据 `message` 文案判断业务逻辑。枚举值由后端返回，前端展示文案统一维护在 `smart-gym-web/src/constants/errorMessages.ts`，与 §1.6 同步。
+
+- 已知错误码显示对应的具体提示；调用方设置 `silent` 时由页面自行处理。
+- 未知后端错误码显示“请求失败，请稍后重试”；不直接把未经约定的后端 `message` 展示给用户。
+- 校验错误可以结合 `data.fieldErrors` 或 `data.violations` 给出字段提示；`traceId` 用于联调与问题定位。
+- 未收到 HTTP 响应时，请求层生成本地 `NETWORK_ERROR`，显示“网络异常或请求超时，请检查网络后重试”。收到非统一信封的 HTTP 错误响应时，生成本地 `HTTP_<状态码>`，显示“请求失败（状态码）”。两者均不是后端业务错误码。
 
 ### 12.2 Agent SSE 重连
 
@@ -1286,19 +1371,19 @@ GET /swagger-ui/index.html
 
 - 前端提交带时区的时间戳。
 - 业务日期字段以用户设置的时区计算。
-- 服务端数据库统一保存带时区转换后的 UTC 时间，响应时转换为用户时区。
+- 认证相关时间在数据库以 UTC 语义保存；认证接口响应返回带 UTC 偏移的 ISO 8601 时间（如 `...Z`）。业务模块接入用户时区后，再按用户时区展示业务时间。
 
 ### 12.4 权限边界
 
-- 会员只能访问自己的健康档案、训练、饮食和 Agent 会话。
-- 教练只能访问授权会员的数据。
+- 用户只能访问自己的健康档案、训练、饮食和 Agent 会话。
+- 教练只能访问已授权用户的数据。
 - 管理员接口统一使用 `/admin` 前缀，并检查管理员角色和操作权限。
 - Agent 工具不接受前端传入的任意 `userId`，默认从登录上下文取得当前用户身份。
 
 ### 12.5 建议的联调顺序
 
 1. 第一步：认证、当前用户和健康档案。
-2. 第二步：动作、器械、训练计划和训练记录。
+2. 第二步：肌群、动作、器械、训练计划和训练记录。
 3. 第三步：食物、营养目标、饮食记录和每日汇总。
 4. 第四步：首页、趋势图和管理端基础页面。
 5. 第五步：Agent 会话、SSE、计划预览和确认。
@@ -1308,13 +1393,13 @@ GET /swagger-ui/index.html
 
 ## 13. 首版暂不开放的接口
 
-以下能力先保留在产品规划中，不进入 v1.0 接口契约：
+以下能力先保留在产品规划中，不进入 v1.2 接口契约：
 
 - 多 Agent 之间的内部通信接口
 - 摄像头动作识别接口
 - 食物图片识别接口
 - 智能手环和 IoT 设备接口
 - 外卖平台菜单同步接口
-- 教练端复杂排课和会员授权接口
+- 教练端复杂排课和用户授权接口
 
 后续新增接口必须保持 `/api/v1` 的兼容性；破坏性修改使用 `/api/v2`，或者通过新增字段实现向后兼容。

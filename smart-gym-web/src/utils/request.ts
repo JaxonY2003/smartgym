@@ -35,8 +35,28 @@ export class ApiError extends Error {
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL
 
-/** 裸实例：仅供 login / refresh 等无拦截器请求使用，天然不会递归 401 */
+/** 裸实例：仅供 login / refresh 等无拦截器请求使用，天然不会递归 401。
+ *  仅做错误信封 → ApiError 的归一化（登录页需要业务错误码显示"账号或密码错误"等文案），
+ *  不注入 token、不参与 401 重试、不弹全局提示。 */
 const rawHttp = axios.create({ baseURL: BASE_URL, timeout: 15_000 })
+
+rawHttp.interceptors.response.use(
+  (res) => {
+    const body = res.data as ApiEnvelope<unknown> | undefined
+    if (body && typeof body.success === 'boolean' && !body.success) {
+      throw new ApiError(body.code, body.message, body.data, res.status)
+    }
+    return res
+  },
+  (error) => {
+    const body = error?.response?.data as ApiEnvelope<unknown> | undefined
+    if (body && typeof body.success === 'boolean') {
+      return Promise.reject(new ApiError(body.code, body.message, body.data, error.response?.status))
+    }
+    return Promise.reject(error)
+  },
+)
+
 export { rawHttp }
 
 const request = axios.create({ baseURL: BASE_URL, timeout: 15_000 })
